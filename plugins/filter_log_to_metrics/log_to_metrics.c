@@ -254,7 +254,7 @@ static int set_labels(struct log_to_metrics_ctx *ctx,
         }
 
         if (counter >= MAX_LABEL_COUNT) {
-            return MAX_LABEL_COUNT;
+            break;
         }
         snprintf(label_keys[counter++], MAX_LABEL_LENGTH - 1, "%s", kv->val);
     }
