@@ -181,6 +181,7 @@ static int set_rules(struct log_to_metrics_ctx *ctx,
             flb_plg_error(ctx->ins, "could not compile regex pattern '%s'",
                           rule->regex_pattern);
             delete_rules(ctx);
+            flb_ra_destroy(rule->ra);
             flb_free(rule);
             return -1;
         }
@@ -399,16 +400,22 @@ static int fill_labels(struct log_to_metrics_ctx *ctx, char **label_values,
         }
         else {
             flb_warn("cannot convert given value to metric");
+
+            flb_ra_key_value_destroy(rval);
+            rval = NULL;
+
+            flb_ra_destroy(ra);
+            ra = NULL;
             break;
         }
+
         if (rval) {
             flb_ra_key_value_destroy(rval);
             rval = NULL;
         }
-        if (ra) {
-            flb_ra_destroy(ra);
-            ra = NULL;
-        }
+
+        flb_ra_destroy(ra);
+        ra = NULL;
     }
     return label_counter;
 }
@@ -704,24 +711,31 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                         flb_error("given value field is empty or not "
                                     "existent: %s. Skipping labels.", fmt);
                                     ctx->label_counter = 0;
-                    }
-                    else if (rval->type != FLB_RA_STRING) {
-                        flb_plg_error(f_ins,
-                            "cannot access label %s", kubernetes_label_keys[i]);
-                        break;
-                    }
-                    else {
-                        snprintf(kubernetes_label_values[i],
-                                MAX_LABEL_LENGTH - 1, "%s", rval->val.string);
-                    }
-                    if (rval) {
-                        flb_ra_key_value_destroy(rval);
-                        rval = NULL;
-                    }
-                    if (ra) {
+
                         flb_ra_destroy(ra);
                         ra = NULL;
+                        break;
                     }
+                    if (rval->type != FLB_RA_STRING) {
+                        flb_plg_error(f_ins,
+                                "cannot access label %s", kubernetes_label_keys[i]);
+
+                        flb_ra_key_value_destroy(rval);
+                        rval = NULL;
+
+                        flb_ra_destroy(ra);
+                        ra = NULL;
+                        break;
+                    }
+
+                    snprintf(kubernetes_label_values[i],
+                            MAX_LABEL_LENGTH - 1, "%s", rval->val.string);
+
+                    flb_ra_key_value_destroy(rval);
+                    rval = NULL;
+
+                    flb_ra_destroy(ra);
+                    ra = NULL;
                 }
             }
             if (ctx->label_counter > 0) {
@@ -729,6 +743,7 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                 label_values = flb_malloc(MAX_LABEL_COUNT * sizeof(char *));
                 if (!label_values) {
                     flb_errno();
+                    flb_free(label_values);
                     msgpack_unpacked_destroy(&result);
                     log_to_metrics_destroy(ctx);
                     return -1;
@@ -770,8 +785,12 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                     rval = flb_ra_get_value_object(ra, map);
                     if (!rval) {
                         flb_warn("given value field is empty or not existent");
+
+                        flb_ra_destroy(ra);
+                        ra = NULL;
                         break;
                     }
+
                     if (rval->type == FLB_RA_STRING) {
                         sscanf(rval->val.string, "%lf", &gauge_value);
                     }
@@ -784,19 +803,23 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                     else {
                         flb_plg_error(f_ins,
                                     "cannot convert given value to metric");
+
+                        flb_ra_key_value_destroy(rval);
+                        rval = NULL;
+
+                        flb_ra_destroy(ra);
+                        ra = NULL;
                         break;
                     }
 
                     ret = cmt_gauge_set(ctx->g, ts, gauge_value,
                                     label_count, label_values);
-                    if (rval) {
-                        flb_ra_key_value_destroy(rval);
-                        rval = NULL;
-                    }
-                    if (ra) {
-                        flb_ra_destroy(ra);
-                        ra = NULL;
-                    }
+
+                    flb_ra_key_value_destroy(rval);
+                    rval = NULL;
+
+                    flb_ra_destroy(ra);
+                    ra = NULL;
                     break;
 
                 case FLB_LOG_TO_METRICS_HISTOGRAM:
@@ -809,8 +832,12 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                     rval = flb_ra_get_value_object(ra, map);
                     if (!rval) {
                         flb_warn("given value field is empty or not existent");
+
+                        flb_ra_destroy(ra);
+                        ra = NULL;
                         break;
                     }
+
                     if (rval->type == FLB_RA_STRING) {
                         sscanf(rval->val.string, "%lf", &histogram_value);
                     }
@@ -823,23 +850,35 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                     else {
                         flb_plg_error(f_ins,
                                     "cannot convert given value to metric");
+
+                        flb_ra_key_value_destroy(rval);
+                        rval = NULL;
+
+                        flb_ra_destroy(ra);
+                        ra = NULL;
                         break;
                     }
 
                     ret = cmt_histogram_observe(ctx->h, ts, histogram_value,
                                     label_count, label_values);
-                    if (rval) {
-                        flb_ra_key_value_destroy(rval);
-                        rval = NULL;
-                    }
-                    if (ra) {
-                        flb_ra_destroy(ra);
-                        ra = NULL;
-                    }
+
+                    flb_ra_key_value_destroy(rval);
+                    rval = NULL;
+
+                    flb_ra_destroy(ra);
+                    ra = NULL;
                     break;
 
                 default:
                     flb_plg_error(f_ins, "unsupported mode");
+
+                    for (i = 0; i < MAX_LABEL_COUNT; i++) {
+                        if (label_values[i] != NULL) {
+                            flb_free(label_values[i]);
+                        }
+                    }
+                    flb_free(label_values);
+                    msgpack_unpacked_destroy(&result);
                     log_to_metrics_destroy(ctx);
                     return -1;
             }
@@ -850,19 +889,17 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
             }
 
             /* Cleanup */
-            msgpack_unpacked_destroy(&result);
-            if (label_values != NULL) {
-                for (i = 0; i < MAX_LABEL_COUNT; i++) {
-                    if (label_values[i] != NULL) {
-                        flb_free(label_values[i]);
-                    }
+            for (i = 0; i < MAX_LABEL_COUNT; i++) {
+                if (label_values[i] != NULL) {
+                    flb_free(label_values[i]);
                 }
-                flb_free(label_values);
             }
+            flb_free(label_values);
         }
         else if (ret == GREP_RET_EXCLUDE) {
             /* Do nothing */
         }
+        msgpack_unpacked_destroy(&result);
     }
     /* Cleanup */
     msgpack_unpacked_destroy(&result);
