@@ -320,6 +320,10 @@ static int set_buckets(struct log_to_metrics_ctx *ctx,
     }
     /* Allocate the memory for buckets */
     ctx->buckets = (double *) flb_malloc(counter * sizeof(double));
+    if (!ctx->buckets) {
+        flb_errno();
+        return -1;
+    }
     /* Set the buckets */
     counter = 0;
     mk_list_foreach(head, &f_ins->properties) {
@@ -452,6 +456,11 @@ static int cb_log_to_metrics_init(struct flb_filter_instance *f_ins,
     ctx->histogram_buckets = NULL;
     ctx->buckets = NULL;
     ctx->bucket_counter = flb_malloc(sizeof(int));
+    if (!ctx->bucket_counter) {
+        flb_errno();
+        log_to_metrics_destroy(ctx);
+        return -1;
+    }
     if (set_buckets(ctx, f_ins) != 0) {
         flb_plg_error(f_ins, "Setting buckets failed");
         log_to_metrics_destroy(ctx);
@@ -461,11 +470,27 @@ static int cb_log_to_metrics_init(struct flb_filter_instance *f_ins,
     /* Set label keys */
     ctx->label_keys = NULL;
     ctx->label_keys = (char **) flb_malloc(MAX_LABEL_COUNT * sizeof(char *));
+    if (!ctx->label_keys) {
+        flb_errno();
+        log_to_metrics_destroy(ctx);
+        return -1;
+    }
     for (i = 0; i < MAX_LABEL_COUNT; i++) {
+        ctx->label_keys[i] = NULL;
         ctx->label_keys[i] = flb_malloc(MAX_LABEL_LENGTH * sizeof(char));
+        if (!ctx->label_keys[i]) {
+            flb_errno();
+            log_to_metrics_destroy(ctx);
+            return -1;
+        }
     }
     ctx->label_counter = NULL;
     ctx->label_counter = flb_malloc(sizeof(int));
+    if (!ctx->label_counter) {
+        flb_errno();
+        log_to_metrics_destroy(ctx);
+        return -1;
+    }
     label_count = set_labels(ctx, ctx->label_keys, ctx->label_counter, f_ins);
     if (label_count < 0) {
         log_to_metrics_destroy(ctx);
@@ -554,6 +579,11 @@ static int cb_log_to_metrics_init(struct flb_filter_instance *f_ins,
     /* create the metric */
     ctx->cmt = NULL;
     ctx->cmt = cmt_create();
+    if (!ctx->cmt) {
+        flb_plg_error(f_ins, "cannot create metrics instance");
+        log_to_metrics_destroy(ctx);
+        return -1;
+    }
 
     /* Depending on mode create different types of cmetrics metrics */
     switch (ctx->mode) {
@@ -697,9 +727,22 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
             if (ctx->label_counter > 0) {
                 /* Fill optional labels */
                 label_values = flb_malloc(MAX_LABEL_COUNT * sizeof(char *));
+                if (!label_values) {
+                    flb_errno();
+                    msgpack_unpacked_destroy(&result);
+                    log_to_metrics_destroy(ctx);
+                    return -1;
+                }
                 for (i = 0; i < MAX_LABEL_COUNT; i++) {
+                    label_values[i] = NULL;
                     label_values[i] = flb_malloc(MAX_LABEL_LENGTH *
                                                     sizeof(char));
+                    if (!label_values[i]) {
+                        flb_errno();
+                        msgpack_unpacked_destroy(&result);
+                        log_to_metrics_destroy(ctx);
+                        return -1;
+                    }
                 }
 
                 label_count = fill_labels(ctx, label_values,
