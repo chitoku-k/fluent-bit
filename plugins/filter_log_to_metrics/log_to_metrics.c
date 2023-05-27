@@ -626,8 +626,6 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
     msgpack_object map;
     msgpack_object root;
     size_t off = 0;
-    msgpack_sbuffer tmp_sbuf;
-    msgpack_packer tmp_pck;
     uint64_t ts;
     struct log_to_metrics_ctx *ctx = context;
     struct flb_ra_value *rval = NULL;
@@ -640,10 +638,6 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
     double histogram_value = 0;
     char kubernetes_label_values
         [NUMBER_OF_KUBERNETES_LABELS][MAX_LABEL_LENGTH];
-
-    /* Create temporary msgpack buffer */
-    msgpack_sbuffer_init(&tmp_sbuf);
-    msgpack_packer_init(&tmp_pck, &tmp_sbuf, msgpack_sbuffer_write);
 
     /* Iterate each item array and apply rules and generate metric values */
     msgpack_unpacked_init(&result);
@@ -829,7 +823,6 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
     }
     /* Cleanup */
     msgpack_unpacked_destroy(&result);
-    msgpack_sbuffer_destroy(&tmp_sbuf);
 
     /* Do not modify message stream */
     return FLB_FILTER_NOTOUCH;
