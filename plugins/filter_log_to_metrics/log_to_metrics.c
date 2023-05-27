@@ -39,13 +39,13 @@
 #include <sys/types.h>
 
 
-static char kubernetes_label_keys[NUMBER_OF_KUBERNETES_LABELS][16] = 
-    { "namespace_name",
-      "pod_name",
-      "container_name",
-      "docker_id",
-      "pod_id"
-    };
+static char kubernetes_label_keys[NUMBER_OF_KUBERNETES_LABELS][16] = {
+    "namespace_name",
+    "pod_name",
+    "container_name",
+    "docker_id",
+    "pod_id"
+};
 
 static void delete_rules(struct log_to_metrics_ctx *ctx)
 {
@@ -70,14 +70,14 @@ static int log_to_metrics_destroy(struct log_to_metrics_ctx *ctx)
     if (!ctx) {
         return 0;
     }
-    if(ctx->histogram_buckets){
+    if (ctx->histogram_buckets) {
         cmt_histogram_buckets_destroy(ctx->histogram_buckets);
     }
 
     if (ctx->cmt) {
         cmt_destroy(ctx->cmt);
     }
-    
+
     delete_rules(ctx);
 
     if (ctx->label_keys != NULL) {
@@ -224,23 +224,22 @@ static inline int grep_filter_data(msgpack_object map,
 }
 
 static int set_labels(struct log_to_metrics_ctx *ctx,
-                      char **label_keys, 
-                      int *label_counter, 
+                      char **label_keys,
+                      int *label_counter,
                       struct flb_filter_instance *f_ins)
 {
-
     struct mk_list *head;
-    struct flb_kv *kv; 
+    struct flb_kv *kv;
     int counter = 0;
     int i;
-    if (MAX_LABEL_COUNT < NUMBER_OF_KUBERNETES_LABELS){
+    if (MAX_LABEL_COUNT < NUMBER_OF_KUBERNETES_LABELS) {
         flb_errno();
         return -1;
     }
-    if (ctx->kubernetes_mode){
-        for (i = 0; i < NUMBER_OF_KUBERNETES_LABELS; i++){ 
-        snprintf(label_keys[i], MAX_LABEL_LENGTH - 1, "%s", 
-                kubernetes_label_keys[i]);
+    if (ctx->kubernetes_mode) {
+        for (i = 0; i < NUMBER_OF_KUBERNETES_LABELS; i++) {
+            snprintf(label_keys[i], MAX_LABEL_LENGTH - 1, "%s",
+                    kubernetes_label_keys[i]);
         }
         counter = NUMBER_OF_KUBERNETES_LABELS;
     }
@@ -269,7 +268,7 @@ static int convert_double(char *str, double *value)
     int i = 0;
     /* input validation */
     for (i = 0; str[i] != '\0'; i++) {
-        if (!(str[i]>='0') && !(str[i] <= '9') && str[i] != '.'
+        if (!(str[i] >= '0') && !(str[i] <= '9') && str[i] != '.'
                         && str[i] != '-' && str[i] != '+') {
             valid = 0;
             break;
@@ -300,10 +299,10 @@ static void sort_doubles_ascending(double *arr, int size)
         }
     }
 }
+
 static int set_buckets(struct log_to_metrics_ctx *ctx,
                       struct flb_filter_instance *f_ins)
 {
-
     struct mk_list *head;
     struct flb_kv *kv;
     double parsed_double = 0.0;
@@ -330,11 +329,11 @@ static int set_buckets(struct log_to_metrics_ctx *ctx,
             continue;
         }
         valid = convert_double(kv->val, &parsed_double);
-        if(!valid){
+        if (!valid) {
             flb_error("Error during conversion");
             return -1;
         }
-        else{
+        else {
             ctx->buckets[counter++] = parsed_double;
         }
     }
@@ -353,25 +352,25 @@ static int fill_labels(struct log_to_metrics_ctx *ctx, char **label_values,
     struct flb_record_accessor *ra = NULL;
     struct flb_ra_value *rval = NULL;
 
-    if (label_counter == 0 && !ctx->kubernetes_mode){
+    if (label_counter == 0 && !ctx->kubernetes_mode) {
         return 0;
     }
-    if (MAX_LABEL_COUNT < NUMBER_OF_KUBERNETES_LABELS){
+    if (MAX_LABEL_COUNT < NUMBER_OF_KUBERNETES_LABELS) {
         flb_errno();
         return -1;
     }
-    if (ctx->kubernetes_mode){
-        for (i = 0; i < NUMBER_OF_KUBERNETES_LABELS; i++){
-            if (kubernetes_label_keys[i] == NULL){
+    if (ctx->kubernetes_mode) {
+        for (i = 0; i < NUMBER_OF_KUBERNETES_LABELS; i++) {
+            if (kubernetes_label_keys[i] == NULL) {
                 return -1;
             }
-            snprintf(label_values[i], MAX_LABEL_LENGTH - 1, "%s", 
+            snprintf(label_values[i], MAX_LABEL_LENGTH - 1, "%s",
                     kubernetes_label_values[i]);
         }
         label_iterator_start = NUMBER_OF_KUBERNETES_LABELS;
     }
 
-    for (i = label_iterator_start; i < label_counter; i++){
+    for (i = label_iterator_start; i < label_counter; i++) {
         ra = flb_ra_create(label_keys[i], FLB_TRUE);
         if (!ra) {
             flb_warn("invalid record accessor key, aborting");
@@ -380,29 +379,29 @@ static int fill_labels(struct log_to_metrics_ctx *ctx, char **label_values,
 
         rval = flb_ra_get_value_object(ra, map);
         if (!rval) {
-        /* Set value to empty string, so the value will be dropped in Cmetrics*/
-        label_values[i][0] = '\0';
+            /* Set value to empty string, so the value will be dropped in Cmetrics */
+            label_values[i][0] = '\0';
         } else if (rval->type == FLB_RA_STRING) {
-            snprintf(label_values[i], MAX_LABEL_LENGTH - 1, "%s", 
+            snprintf(label_values[i], MAX_LABEL_LENGTH - 1, "%s",
             rval->val.string);
         }
         else if (rval->type == FLB_RA_FLOAT) {
-            snprintf(label_values[i], MAX_LABEL_LENGTH - 1, "%f", 
+            snprintf(label_values[i], MAX_LABEL_LENGTH - 1, "%f",
             rval->val.f64);
         }
         else if (rval->type == FLB_RA_INT) {
-            snprintf(label_values[i], MAX_LABEL_LENGTH - 1, "%ld", 
+            snprintf(label_values[i], MAX_LABEL_LENGTH - 1, "%ld",
             (long)rval->val.i64);
         }
         else {
             flb_warn("cannot convert given value to metric");
             break;
         }
-        if (rval){
+        if (rval) {
             flb_ra_key_value_destroy(rval);
             rval = NULL;
         }
-        if (ra){
+        if (ra) {
             flb_ra_destroy(ra);
             ra = NULL;
         }
@@ -453,8 +452,7 @@ static int cb_log_to_metrics_init(struct flb_filter_instance *f_ins,
     ctx->histogram_buckets = NULL;
     ctx->buckets = NULL;
     ctx->bucket_counter = flb_malloc(sizeof(int));
-    if(set_buckets(ctx, f_ins) != 0)
-    {
+    if (set_buckets(ctx, f_ins) != 0) {
         flb_plg_error(f_ins, "Setting buckets failed");
         log_to_metrics_destroy(ctx);
         return -1;
@@ -469,7 +467,7 @@ static int cb_log_to_metrics_init(struct flb_filter_instance *f_ins,
     ctx->label_counter = NULL;
     ctx->label_counter = flb_malloc(sizeof(int));
     label_count = set_labels(ctx, ctx->label_keys, ctx->label_counter, f_ins);
-    if (label_count < 0){
+    if (label_count < 0) {
         log_to_metrics_destroy(ctx);
         return -1;
     }
@@ -482,7 +480,7 @@ static int cb_log_to_metrics_init(struct flb_filter_instance *f_ins,
     }
 
     /* Check property metric mode */
-    ctx->mode = 0; 
+    ctx->mode = 0;
     tmp = (char *)flb_filter_get_property("metric_mode", f_ins);
     if (tmp != NULL) {
         if (strcasecmp(tmp, FLB_LOG_TO_METRICS_COUNTER_STR) == 0) {
@@ -534,26 +532,24 @@ static int cb_log_to_metrics_init(struct flb_filter_instance *f_ins,
             log_to_metrics_destroy(ctx);
             return -1;
         }
-        snprintf(value_field, sizeof(value_field) - 1, "%s", 
+        snprintf(value_field, sizeof(value_field) - 1, "%s",
                     ctx->value_field);
     }
 
-
     /* Check if buckets are defined for histogram, if not assume defaults */
-    if (ctx->mode == FLB_LOG_TO_METRICS_HISTOGRAM ){
-        if (ctx->bucket_counter == 0){
+    if (ctx->mode == FLB_LOG_TO_METRICS_HISTOGRAM) {
+        if (ctx->bucket_counter == 0) {
             flb_plg_error(f_ins,
                 "buckets are not set for histogram."
                 "Will use defaults: 0.005, 0.01, 0.025, "
                 "0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0");
             ctx->histogram_buckets = cmt_histogram_buckets_default_create();
         }
-        else{
+        else {
             ctx->histogram_buckets = cmt_histogram_buckets_create_size(
                                         ctx->buckets, *ctx->bucket_counter);
         }
     }
-
 
     /* create the metric */
     ctx->cmt = NULL;
@@ -563,12 +559,12 @@ static int cb_log_to_metrics_init(struct flb_filter_instance *f_ins,
     switch (ctx->mode) {
         case FLB_LOG_TO_METRICS_COUNTER:
             ctx->c = cmt_counter_create(ctx->cmt, "log_metric", "counter",
-                                   metric_name, metric_description, 
+                                   metric_name, metric_description,
                                    label_count, ctx->label_keys);
             break;
         case FLB_LOG_TO_METRICS_GAUGE:
             ctx->g = cmt_gauge_create(ctx->cmt, "log_metric", "gauge",
-                                      metric_name, metric_description, 
+                                      metric_name, metric_description,
                                       label_count, ctx->label_keys);
             break;
         case FLB_LOG_TO_METRICS_HISTOGRAM:
@@ -619,7 +615,7 @@ static int cb_log_to_metrics_init(struct flb_filter_instance *f_ins,
 }
 
 static int cb_log_to_metrics_filter(const void *data, size_t bytes,
-                            const char *tag, int tag_len, 
+                            const char *tag, int tag_len,
                             void **out_buf, size_t *out_size,
                             struct flb_filter_instance *f_ins,
                             struct flb_input_instance *i_ins, void *context,
@@ -664,9 +660,9 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
         ret = grep_filter_data(map, context);
         if (ret == GREP_RET_KEEP) {
             ts = cfl_time_now();
-            if(ctx->kubernetes_mode){
-                for(i = 0; i < NUMBER_OF_KUBERNETES_LABELS; i++){
-                    if (kubernetes_label_keys[i] == NULL){
+            if (ctx->kubernetes_mode) {
+                for (i = 0; i < NUMBER_OF_KUBERNETES_LABELS; i++) {
+                    if (kubernetes_label_keys[i] == NULL) {
                         flb_error("error during kubernetes label processing. "
                                     "Skipping labels.");
                                     ctx->label_counter = 0;
@@ -691,31 +687,31 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                         break;
                     }
                     else {
-                        snprintf(kubernetes_label_values[i], 
+                        snprintf(kubernetes_label_values[i],
                                 MAX_LABEL_LENGTH - 1, "%s", rval->val.string);
                     }
-                    if (rval){
+                    if (rval) {
                         flb_ra_key_value_destroy(rval);
                         rval = NULL;
                     }
-                    if (ra){
+                    if (ra) {
                         flb_ra_destroy(ra);
                         ra = NULL;
                     }
                 }
             }
-            if (ctx->label_counter > 0){
+            if (ctx->label_counter > 0) {
                 /* Fill optional labels */
                 label_values = flb_malloc(MAX_LABEL_COUNT * sizeof(char *));
                 for (i = 0; i < MAX_LABEL_COUNT; i++) {
-                    label_values[i] = flb_malloc(MAX_LABEL_LENGTH * 
+                    label_values[i] = flb_malloc(MAX_LABEL_LENGTH *
                                                     sizeof(char));
                 }
-            
-                label_count = fill_labels(ctx, label_values, 
-                                    kubernetes_label_values, ctx->label_keys, 
+
+                label_count = fill_labels(ctx, label_values,
+                                    kubernetes_label_values, ctx->label_keys,
                                     *ctx->label_counter, map);
-                if (label_count != *ctx->label_counter){
+                if (label_count != *ctx->label_counter) {
                     label_count = 0;
                 }
             }
@@ -723,7 +719,7 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
             /* Calculating and setting metric depending on the mode */
             switch (ctx->mode) {
                 case FLB_LOG_TO_METRICS_COUNTER:
-                    ret = cmt_counter_inc(ctx->c, ts, label_count, 
+                    ret = cmt_counter_inc(ctx->c, ts, label_count,
                                     label_values);
                     break;
 
@@ -735,7 +731,6 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                     }
 
                     rval = flb_ra_get_value_object(ra, map);
-
                     if (!rval) {
                         flb_warn("given value field is empty or not existent");
                         break;
@@ -750,11 +745,11 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                         gauge_value = (double)rval->val.i64;
                     }
                     else {
-                        flb_plg_error(f_ins, 
+                        flb_plg_error(f_ins,
                                     "cannot convert given value to metric");
                         break;
                     }
-                    
+
                     ret = cmt_gauge_set(ctx->g, ts, gauge_value,
                                     label_count, label_values);
                     if (rval) {
@@ -775,7 +770,6 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                     }
 
                     rval = flb_ra_get_value_object(ra, map);
-
                     if (!rval) {
                         flb_warn("given value field is empty or not existent");
                         break;
@@ -806,23 +800,23 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
                         ra = NULL;
                     }
                     break;
+
                 default:
                     flb_plg_error(f_ins, "unsupported mode");
                     log_to_metrics_destroy(ctx);
                     return -1;
             }
-            
-            ret = flb_input_metrics_append(ctx->input_ins, ctx->tag, strlen(ctx->tag), ctx->cmt);
 
-	    if (ret != 0) {
+            ret = flb_input_metrics_append(ctx->input_ins, ctx->tag, strlen(ctx->tag), ctx->cmt);
+            if (ret != 0) {
                 flb_plg_error(ctx->ins, "could not append metrics");
             }
-            
+
             /* Cleanup */
             msgpack_unpacked_destroy(&result);
-            if (label_values != NULL){
+            if (label_values != NULL) {
                 for (i = 0; i < MAX_LABEL_COUNT; i++) {
-                    if (label_values[i] != NULL){
+                    if (label_values[i] != NULL) {
                         flb_free(label_values[i]);
                     }
                 }
@@ -850,38 +844,38 @@ static int cb_log_to_metrics_exit(void *data, struct flb_config *config)
 
 static struct flb_config_map config_map[] = {
     {
-     FLB_CONFIG_MAP_STR, "regex", NULL, 
+     FLB_CONFIG_MAP_STR, "regex", NULL,
      FLB_CONFIG_MAP_MULT, FLB_FALSE, 0,
      "Optional filter for records in which the content of KEY "
      "matches the regular expression."
     },
     {
-     FLB_CONFIG_MAP_STR, "exclude", NULL, 
+     FLB_CONFIG_MAP_STR, "exclude", NULL,
      FLB_CONFIG_MAP_MULT, FLB_FALSE, 0,
      "Optional filter for records in which the content of KEY "
      "does not matches the regular expression."
     },
     {
-     FLB_CONFIG_MAP_STR, "metric_mode", "counter", 
+     FLB_CONFIG_MAP_STR, "metric_mode", "counter",
      FLB_FALSE, FLB_TRUE,
      offsetof(struct log_to_metrics_ctx, mode),
      "Mode selector. Values counter, gauge,"
      " or histogram. Summary is not supported"
     },
     {
-     FLB_CONFIG_MAP_STR, "value_field", NULL, 
+     FLB_CONFIG_MAP_STR, "value_field", NULL,
      FLB_FALSE, FLB_TRUE,
      offsetof(struct log_to_metrics_ctx, value_field),
      "Numeric field to use for gauge or histogram"
     },
     {
-     FLB_CONFIG_MAP_STR, "metric_name", NULL, 
+     FLB_CONFIG_MAP_STR, "metric_name", NULL,
      FLB_FALSE, FLB_TRUE,
      offsetof(struct log_to_metrics_ctx, metric_name),
      "Name of metric"
     },
     {
-     FLB_CONFIG_MAP_STR, "metric_description", NULL, 
+     FLB_CONFIG_MAP_STR, "metric_description", NULL,
      FLB_FALSE, FLB_TRUE,
      offsetof(struct log_to_metrics_ctx, metric_description),
      "Help text for metric"
@@ -892,7 +886,7 @@ static struct flb_config_map config_map[] = {
      "Enable kubernetes log metric fields"
     },
     {
-     FLB_CONFIG_MAP_STR, "label_field", NULL, 
+     FLB_CONFIG_MAP_STR, "label_field", NULL,
      FLB_CONFIG_MAP_MULT, FLB_FALSE, 0,
      "Specify message field that should be included in the metric"
     },
