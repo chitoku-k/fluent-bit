@@ -899,7 +899,6 @@ static int cb_log_to_metrics_filter(const void *data, size_t bytes,
         else if (ret == GREP_RET_EXCLUDE) {
             /* Do nothing */
         }
-        msgpack_unpacked_destroy(&result);
     }
     /* Cleanup */
     msgpack_unpacked_destroy(&result);
